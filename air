@@ -1,5 +1,29 @@
 #!/bin/bash
 
+# 显示进度条函数
+show_progress() {
+    local duration=$1
+    local interval=1
+    local elapsed=0
+    while [ $elapsed -lt $duration ]; do
+        printf "\r["
+        for ((i = 0; i < elapsed; i++)); do
+            printf "#"
+        done
+        for ((i = elapsed; i < duration; i++)); do
+            printf " "
+        done
+        printf "] %d%%" $((elapsed * 100 / duration))
+        sleep $interval
+        elapsed=$((elapsed + interval))
+    done
+    printf "\r["
+    for ((i = 0; i < duration; i++)); do
+        printf "#"
+    done
+    printf "] 100%%\n"
+}
+
 # 确保 PATH 包含 Go 的安装路径
 export PATH=$PATH:/usr/local/go/bin
 
@@ -25,22 +49,20 @@ install_if_needed pkg-config
 install_if_needed libssl-dev
 install_if_needed wget
 
-# 安装 Go
-if command -v go >/dev/null 2>&1; then
-    echo "go 已安装，跳过安装步骤。"
-else
-    echo "下载并安装 Go..."
-    curl https://dl.google.com/go/go1.22.1.linux-amd64.tar.gz | sudo tar -C /usr/local -zxvf - 
-    echo 'export GOROOT=/usr/local/go' >> $HOME/.bashrc
-    echo 'export GOPATH=$HOME/go' >> $HOME/.bashrc
-    echo 'export GO111MODULE=on' >> $HOME/.bashrc
-    echo 'export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin' >> $HOME/.bashrc
-    source ~/.bashrc
-fi
+# 卸载现有的 Go 安装
+sudo rm -rf /usr/local/go
+
+# 下载并安装 Go
+echo "下载并安装 Go..."
+wget -c https://golang.org/dl/go1.22.1.linux-amd64.tar.gz -O - | sudo tar -xz -C /usr/local
+echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+source ~/.bashrc
 
 # 验证安装后的 Go 版本
 echo "当前 Go 版本："
 go version
+
+show_progress 10
 
 # 下载GitHub库
 cd $HOME
@@ -71,6 +93,8 @@ sudo systemctl daemon-reload
 sudo systemctl enable wasmstationd
 sudo systemctl start wasmstationd
 
+show_progress 10
+
 # 创建key，确保名称不包含空格
 while true; do
     read -p "请输入钱包名: " wallet_name
@@ -82,12 +106,17 @@ while true; do
 done
 
 echo "创建密钥中..."
-key_output=$(echo "123" | eigenlayer operator keys create --key-type ecdsa --insecure "$wallet_name" 2>&1)
+key_output=$(eigenlayer operator keys create --key-type ecdsa --insecure "$wallet_name" 2>&1)
 echo "密钥创建命令输出："
 echo "$key_output"
+public_key_hex=$(echo "$key_output" | grep 'Public Key (hex):' | awk '{print $NF}')
+if [ -z "$public_key_hex" ]; then
+    echo "未能提取到 Public Key (hex)。请手动输入。"
+    read -p "请输入 Public Key hex: " public_key_hex
+fi
+echo "Public Key hex: $public_key_hex"
 
-# 手动输入 Public Key (hex)
-read -p "请输入 Public Key (hex): " public_key_hex
+show_progress 10
 
 # 删除旧数据并设置Tracks
 sudo rm -rf ~/.tracks
@@ -97,6 +126,8 @@ go mod tidy
 # 初始化sequencer
 read -p "请输入节点名: " moniker
 go run cmd/main.go init --daRpc "disperser-holesky.eigenda.xyz" --daKey "$public_key_hex" --daType "eigen" --moniker "$moniker" --stationRpc "http://127.0.0.1:26657" --stationAPI "http://127.0.0.1:1317" --stationType "wasm"
+
+show_progress 10
 
 # 创建airchains地址并记录助记词
 go run cmd/main.go keys junction --accountName $wallet_name --accountPath $HOME/.tracks/junction-accounts/keys
@@ -111,6 +142,8 @@ if [[ "$choice" != "yes" ]]; then
     exit 0
 fi
 
+show_progress 10
+
 # 初始化prover
 go run cmd/main.go prover v1WASM
 
@@ -120,10 +153,14 @@ ip=$(curl -s4 ifconfig.me/ip)
 bootstrapNode=/ip4/$ip/tcp/2300/p2p/$nodeid
 echo "获取到的bootstrapNode值: $bootstrapNode"
 
+show_progress 10
+
 # 修改代码默认的gas price
 sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 2*gas)/' "$HOME/tracks/junction/verifyPod.go"
 sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 2*gas)/' "$HOME/tracks/junction/validateVRF.go"
 sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 3*gas)/' "$HOME/tracks/junction/submitPod.go"
+
+show_progress 10
 
 # 启动station
 sudo tee /etc/systemd/system/stationd.service > /dev/null << EOF
@@ -145,10 +182,14 @@ sudo systemctl daemon-reload
 sudo systemctl enable stationd
 sudo systemctl restart stationd
 
+show_progress 10
+
 # 创建station
 echo "准备创建station，输入您修改后的RPC地址："
 read rpc_address
 go run cmd/main.go create-station --accountName $wallet_name --accountPath $HOME/.tracks/junction-accounts/keys --jsonRPC "$rpc_address" --info "WASM Track" --tracks $wallet_name --bootstrapNode "$bootstrapNode"
+
+show_progress 10
 
 # 创建刷TX脚本
 cd
@@ -174,6 +215,32 @@ nohup bash spam.sh &
 
 echo "所有步骤已完成，您可以使用以下命令查看日志："
 echo "sudo journalctl -u stationd -f -o cat"
+
+# 删除节点功能
+function delete_node() {
+    read -p "确定要删除节点吗？这将删除所有相关数据。 (yes/no): " choice
+    if [[ "$choice" == "yes" ]]; then
+        sudo systemctl stop wasmstationd
+        sudo systemctl stop stationd
+        sudo systemctl disable wasmstationd
+        sudo systemctl disable stationd
+        sudo rm -rf $HOME/wasm-station
+        sudo rm -rf $HOME/tracks
+        sudo rm -rf ~/.tracks
+        sudo rm -rf ~/.wasmstationd
+        sudo systemctl daemon-reload
+        echo "节点已删除。"
+    else
+        echo "删除操作已取消。"
+    fi
+}
+
+# 提示是否删除节点
+read -p "是否需要删除节点？ (yes/no): " delete_choice
+if [[ "$delete_choice" == "yes" ]]; then
+    delete_node
+fi
+
 
 
 
