@@ -82,7 +82,7 @@ while true; do
 done
 
 echo "创建密钥中..."
-key_output=$(eigenlayer operator keys create --key-type ecdsa --insecure "$wallet_name" 2>&1)
+key_output=$(echo "123" | eigenlayer operator keys create --key-type ecdsa --insecure "$wallet_name" 2>&1)
 echo "密钥创建命令输出："
 echo "$key_output"
 public_key_hex=$(echo "$key_output" | grep 'Public Key (hex):' | awk '{print $NF}')
@@ -177,3 +177,4 @@ nohup bash spam.sh &
 
 echo "所有步骤已完成，您可以使用以下命令查看日志："
 echo "sudo journalctl -u stationd -f -o cat"
+
