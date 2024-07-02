@@ -106,7 +106,13 @@ while true; do
 done
 
 echo "创建密钥中..."
-key_output=$(eigenlayer operator keys create --key-type ecdsa --insecure "$wallet_name" 2>&1)
+key_output=$(expect -c "
+set timeout -1
+spawn eigenlayer operator keys create --key-type ecdsa --insecure \"$wallet_name\"
+expect \"ECDSA Private Key (Hex):\"
+send -- \"\\r\"
+expect eof
+")
 echo "密钥创建命令输出："
 echo "$key_output"
 public_key_hex=$(echo "$key_output" | grep 'Public Key (hex):' | awk '{print $NF}')
@@ -240,6 +246,7 @@ read -p "是否需要删除节点？ (yes/no): " delete_choice
 if [[ "$delete_choice" == "yes" ]]; then
     delete_node
 fi
+
 
 
 
