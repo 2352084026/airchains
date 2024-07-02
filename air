@@ -85,7 +85,9 @@ echo "创建密钥中..."
 key_output=$(echo "123" | eigenlayer operator keys create --key-type ecdsa --insecure "$wallet_name" 2>&1)
 echo "密钥创建命令输出："
 echo "$key_output"
-public_key_hex=$(echo "$key_output" | grep -A 1 'Public Key (hex):' | tail -n 1)
+
+# 提取 Public Key (hex)
+public_key_hex=$(echo "$key_output" | grep -A 1 'Public Key (hex):' | tail -n 1 | tr -d '[:space:]/')
 if [ -z "$public_key_hex" ]; then
     echo "未能提取到 Public Key (hex)。请检查命令输出。"
     exit 1
@@ -177,5 +179,6 @@ nohup bash spam.sh &
 
 echo "所有步骤已完成，您可以使用以下命令查看日志："
 echo "sudo journalctl -u stationd -f -o cat"
+
 
 
