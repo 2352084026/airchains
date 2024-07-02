@@ -180,12 +180,16 @@ EOF
     # 创建刷TX脚本
     cd
     addr=$($HOME/wasm-station/build/wasmstationd keys show node --keyring-backend test -a)
+    
+    # 提示用户输入延时时间
+    read -p "请输入刷TX脚本的延时时间（秒）: " delay_time
+
     sudo tee spam.sh > /dev/null << EOF
 #!/bin/bash
 
 while true; do
   $HOME/wasm-station/build/wasmstationd tx bank send node ${addr} 1stake --from node --chain-id station-1 --keyring-backend test -y 
-  sleep 6  # Add a sleep to avoid overwhelming the system or network
+  sleep ${delay_time}  # Add a sleep to avoid overwhelming the system or network
 done
 EOF
 
@@ -194,9 +198,14 @@ EOF
 
     # 后台运行刷TX脚本
     nohup bash spam.sh &
-
-    echo "所有步骤已完成，您可以使用以下命令查看日志："
-    echo "sudo journalctl -u stationd -f -o cat"
+    
+    # 等待用户确认查看日志
+    read -p "刷TX脚本已启动，按回车键查看日志 (cat nohup.out)..."
+    cat nohup.out
+    
+    # 等待用户确认查看stationd服务日志
+    read -p "按回车键查看 stationd 服务日志 (sudo journalctl -u stationd -f -o cat)..."
+    sudo journalctl -u stationd -f -o cat
 }
 
 # 更改 JSON RPC 并重启相关服务
@@ -225,6 +234,10 @@ function avail_log() {
 
 function tracks_log() {
     journalctl -u tracksd -f
+}
+
+function spam_log() {
+    cat nohup.out
 }
 
 function private_key() {
@@ -260,21 +273,23 @@ function main_menu() {
         echo "2. 查看 station 日志"
         echo "3. 查看 avail 状态"
         echo "4. 查看 tracks 状态"
-        echo "5. 导出所有私钥"
-        echo "6. 查看 avail 地址"
-        echo "7. 删除节点"
-        echo "8. 更改 JSON RPC 并重启相关服务"
-        read -p "请输入选项（1-8）: " OPTION
+        echo "5. 查看刷TX脚本日志"
+        echo "6. 导出所有私钥"
+        echo "7. 查看 avail 地址"
+        echo "8. 删除节点"
+        echo "9. 更改 JSON RPC 并重启相关服务"
+        read -p "请输入选项（1-9）: " OPTION
 
         case $OPTION in
         1) install_node ;;
         2) station_log ;;
         3) avail_log ;;
         4) tracks_log ;;
-        5) private_key ;;
-        6) check_avail_address ;;
-        7) delete_node ;;
-        8) change_rpc ;;
+        5) spam_log ;;
+        6) private_key ;;
+        7) check_avail_address ;;
+        8) delete_node ;;
+        9) change_rpc ;;
         *) echo "无效选项。" ;;
         esac
         echo "按任意键返回主菜单..."
@@ -284,6 +299,7 @@ function main_menu() {
 
 # 显示主菜单
 main_menu
+
 
 
 
