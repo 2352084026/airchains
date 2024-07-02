@@ -232,11 +232,7 @@ function avail_log() {
     journalctl -u availd -f
 }
 
-function tracks_log() {
-    journalctl -u tracksd -f
-}
-
-function spam_log() {
+function roullp_log() {
     cat nohup.out
 }
 
@@ -272,24 +268,22 @@ function main_menu() {
         echo "1. 安装节点"
         echo "2. 查看 station 日志"
         echo "3. 查看 avail 状态"
-        echo "4. 查看 tracks 状态"
-        echo "5. 查看刷TX脚本日志"
-        echo "6. 导出所有私钥"
-        echo "7. 查看 avail 地址"
-        echo "8. 删除节点"
-        echo "9. 更改 JSON RPC 并重启相关服务"
-        read -p "请输入选项（1-9）: " OPTION
+        echo "4. 查看 roullp"
+        echo "5. 导出所有私钥"
+        echo "6. 查看 avail 地址"
+        echo "7. 删除节点"
+        echo "8. 更改 JSON RPC 并重启相关服务"
+        read -p "请输入选项（1-8）: " OPTION
 
         case $OPTION in
         1) install_node ;;
         2) station_log ;;
         3) avail_log ;;
-        4) tracks_log ;;
-        5) spam_log ;;
-        6) private_key ;;
-        7) check_avail_address ;;
-        8) delete_node ;;
-        9) change_rpc ;;
+        4) roullp_log ;;
+        5) private_key ;;
+        6) check_avail_address ;;
+        7) delete_node ;;
+        8) change_rpc ;;
         *) echo "无效选项。" ;;
         esac
         echo "按任意键返回主菜单..."
@@ -299,6 +293,7 @@ function main_menu() {
 
 # 显示主菜单
 main_menu
+
 
 
 
