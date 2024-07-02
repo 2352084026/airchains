@@ -177,12 +177,33 @@ EOF
     sudo systemctl enable stationd
     sudo systemctl restart stationd
 
+    # 检查 RPC 是否正常
+    read -p "RPC 是否正常？(yes/no): " rpc_status
+    if [[ "$rpc_status" != "yes" ]]; then
+        read -p "请输入新的 JSON RPC 地址: " JSON_RPC
+        create_station_cmd="go run cmd/main.go create-station \
+            --accountName wallet \
+            --accountPath $HOME/.tracks/junction-accounts/keys \
+            --jsonRPC \"$JSON_RPC\" \
+            --info \"$INFO\" \
+            --tracks \"$AIR_ADDRESS\" \
+            --bootstrapNode \"$BOOTSTRAP_NODE\""
+        echo "Running command:"
+        echo "$create_station_cmd"
+        eval "$create_station_cmd"
+    fi
+
     # 创建刷TX脚本
     cd
     addr=$($HOME/wasm-station/build/wasmstationd keys show node --keyring-backend test -a)
     
     # 提示用户输入延时时间
     read -p "请输入刷TX脚本的延时时间（秒）: " delay_time
+
+    if [[ -z "$delay_time" ]]; then
+        echo "延时时间不能为空，请重新输入。"
+        read -p "请输入刷TX脚本的延时时间（秒）: " delay_time
+    fi
 
     sudo tee spam.sh > /dev/null << EOF
 #!/bin/bash
@@ -293,6 +314,7 @@ function main_menu() {
 
 # 显示主菜单
 main_menu
+
 
 
 
