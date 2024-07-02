@@ -1,0 +1,179 @@
+#!/bin/bash
+
+# 确保 PATH 包含 Go 的安装路径
+export PATH=$PATH:/usr/local/go/bin
+
+# 检查并安装所需的工具
+install_if_needed() {
+    local package=$1
+    if dpkg-query -W "$package" >/dev/null 2>&1; then
+        echo "$package 已安装，跳过安装步骤。"
+    else
+        echo "安装 $package..."
+        sudo apt update
+        sudo apt install -y "$package"
+    fi
+}
+
+install_if_needed build-essential
+install_if_needed git
+install_if_needed make
+install_if_needed jq
+install_if_needed curl
+install_if_needed clang
+install_if_needed pkg-config
+install_if_needed libssl-dev
+install_if_needed wget
+
+# 安装 Go
+if command -v go >/dev/null 2>&1; then
+    echo "go 已安装，跳过安装步骤。"
+else
+    echo "下载并安装 Go..."
+    curl https://dl.google.com/go/go1.22.1.linux-amd64.tar.gz | sudo tar -C /usr/local -zxvf - 
+    echo 'export GOROOT=/usr/local/go' >> $HOME/.bashrc
+    echo 'export GOPATH=$HOME/go' >> $HOME/.bashrc
+    echo 'export GO111MODULE=on' >> $HOME/.bashrc
+    echo 'export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin' >> $HOME/.bashrc
+    source ~/.bashrc
+fi
+
+# 验证安装后的 Go 版本
+echo "当前 Go 版本："
+go version
+
+# 下载GitHub库
+cd $HOME
+git clone https://github.com/airchains-network/wasm-station.git
+git clone https://github.com/airchains-network/tracks.git
+
+# 设置Wasm Station
+cd wasm-station
+go mod tidy
+/bin/bash ./scripts/local-setup.sh
+
+# 运行wasmstation
+sudo tee /etc/systemd/system/wasmstationd.service > /dev/null << EOF
+[Unit]
+Description=wasmstationd
+After=network.target
+[Service]
+User=$USER
+ExecStart=$HOME/wasm-station/build/wasmstationd start --api.enable
+Restart=always
+RestartSec=3
+LimitNOFILE=10000
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable wasmstationd
+sudo systemctl start wasmstationd
+
+# 创建key，确保名称不包含空格
+while true; do
+    read -p "请输入钱包名: " wallet_name
+    if [[ "$wallet_name" =~ \ |\' ]]; then
+        echo "钱包名不能包含空格或单引号，请重新输入。"
+    else
+        break
+    fi
+done
+
+echo "创建密钥中..."
+key_output=$(eigenlayer operator keys create --key-type ecdsa --insecure "$wallet_name" 2>&1)
+echo "密钥创建命令输出："
+echo "$key_output"
+public_key_hex=$(echo "$key_output" | grep 'Public Key (hex):' | awk '{print $NF}')
+if [ -z "$public_key_hex" ]; then
+    echo "未能提取到 Public Key (hex)。请检查命令输出。"
+    exit 1
+fi
+echo "Public Key hex: $public_key_hex"
+
+# 删除旧数据并设置Tracks
+sudo rm -rf ~/.tracks
+cd $HOME/tracks
+go mod tidy
+
+# 初始化sequencer
+read -p "请输入节点名: " moniker
+go run cmd/main.go init --daRpc "disperser-holesky.eigenda.xyz" --daKey "$public_key_hex" --daType "eigen" --moniker "$moniker" --stationRpc "http://127.0.0.1:26657" --stationAPI "http://127.0.0.1:1317" --stationType "wasm"
+
+# 创建airchains地址并记录助记词
+go run cmd/main.go keys junction --accountName $wallet_name --accountPath $HOME/.tracks/junction-accounts/keys
+echo "保存好显示的助记词，输入任意键继续"
+read -n 1
+
+# 领水
+echo "请在discord的Switchyard-faucet频道发送 $faucet air开头的地址领水"
+read -p "是否已经领水完毕要继续执行？(yes/no): " choice
+if [[ "$choice" != "yes" ]]; then
+    echo "脚本已终止。"
+    exit 0
+fi
+
+# 初始化prover
+go run cmd/main.go prover v1WASM
+
+# 获取bootstrapNode值
+nodeid=$(grep "node_id" ~/.tracks/config/sequencer.toml | awk -F '"' '{print $2}')
+ip=$(curl -s4 ifconfig.me/ip)
+bootstrapNode=/ip4/$ip/tcp/2300/p2p/$nodeid
+echo "获取到的bootstrapNode值: $bootstrapNode"
+
+# 修改代码默认的gas price
+sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 2*gas)/' "$HOME/tracks/junction/verifyPod.go"
+sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 2*gas)/' "$HOME/tracks/junction/validateVRF.go"
+sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 3*gas)/' "$HOME/tracks/junction/submitPod.go"
+
+# 启动station
+sudo tee /etc/systemd/system/stationd.service > /dev/null << EOF
+[Unit]
+Description=station track service
+After=network-online.target
+[Service]
+User=$USER
+WorkingDirectory=$HOME/tracks/
+ExecStart=$(which go) run cmd/main.go start
+Restart=always
+RestartSec=3
+LimitNOFILE=65535
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable stationd
+sudo systemctl restart stationd
+
+# 创建station
+echo "准备创建station，输入您修改后的RPC地址："
+read rpc_address
+go run cmd/main.go create-station --accountName $wallet_name --accountPath $HOME/.tracks/junction-accounts/keys --jsonRPC "$rpc_address" --info "WASM Track" --tracks $wallet_name --bootstrapNode "$bootstrapNode"
+
+# 创建刷TX脚本
+cd
+addr=$($HOME/wasm-station/build/wasmstationd keys show node --keyring-backend test -a)
+sudo tee spam.sh > /dev/null << EOF
+#!/bin/bash
+
+while true; do
+  $HOME/wasm-station/build/wasmstationd tx bank send node ${addr} 1stake --from node --chain-id station-1 --keyring-backend test -y 
+  sleep 6  # Add a sleep to avoid overwhelming the system or network
+done
+EOF
+
+# 确保脚本有执行权限
+chmod +x spam.sh
+
+# 提示修改延时
+echo "请修改 spam.sh 脚本中的延时，然后按任意键继续..."
+read -n 1
+
+# 后台运行刷TX脚本
+nohup bash spam.sh &
+
+echo "所有步骤已完成，您可以使用以下命令查看日志："
+echo "sudo journalctl -u stationd -f -o cat"
