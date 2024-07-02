@@ -130,58 +130,16 @@ EOF
     unset http_proxy
     unset https_proxy
 
-    # 提示用户输入 JSON RPC 地址
-    read -p "请输入新的 JSON RPC 地址: " JSON_RPC
-
-    # 定义其他参数
-    INFO="EVM Track"
-    TRACKS="$AIR_ADDRESS"
-    BOOTSTRAP_NODE="/ip4/$LOCAL_IP/tcp/2300/p2p/$NODE_ID"
-
-    # 运行 tracks create-station 命令
-    create_station_cmd="go run cmd/main.go create-station \
-        --accountName wallet \
-        --accountPath $HOME/.tracks/junction-accounts/keys \
-        --jsonRPC \"$JSON_RPC\" \
-        --info \"$INFO\" \
-        --tracks \"$AIR_ADDRESS\" \
-        --bootstrapNode \"$BOOTSTRAP_NODE\""
-
-    echo "Running command:"
-    echo "$create_station_cmd"
-
-    # 执行命令
-    eval "$create_station_cmd"
-
-    # 修改代码默认的gas price
-    sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 2*gas)/' "$HOME/tracks/junction/verifyPod.go"
-    sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 2*gas)/' "$HOME/tracks/junction/validateVRF.go"
-    sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 3*gas)/' "$HOME/tracks/junction/submitPod.go"
-
-    # 启动station
-    sudo tee /etc/systemd/system/stationd.service > /dev/null << EOF
-[Unit]
-Description=station track service
-After=network-online.target
-[Service]
-User=$USER
-WorkingDirectory=$HOME/tracks/
-ExecStart=$(which go) run cmd/main.go start
-Restart=always
-RestartSec=3
-LimitNOFILE=65535
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    sudo systemctl daemon-reload
-    sudo systemctl enable stationd
-    sudo systemctl restart stationd
-
-    # 检查 RPC 是否正常
-    read -p "RPC 是否正常？(yes/no): " rpc_status
-    if [[ "$rpc_status" != "yes" ]]; then
+    while true; do
+        # 提示用户输入 JSON RPC 地址
         read -p "请输入新的 JSON RPC 地址: " JSON_RPC
+
+        # 定义其他参数
+        INFO="EVM Track"
+        TRACKS="$AIR_ADDRESS"
+        BOOTSTRAP_NODE="/ip4/$LOCAL_IP/tcp/2300/p2p/$NODE_ID"
+
+        # 运行 tracks create-station 命令
         create_station_cmd="go run cmd/main.go create-station \
             --accountName wallet \
             --accountPath $HOME/.tracks/junction-accounts/keys \
@@ -189,10 +147,19 @@ EOF
             --info \"$INFO\" \
             --tracks \"$AIR_ADDRESS\" \
             --bootstrapNode \"$BOOTSTRAP_NODE\""
+
         echo "Running command:"
         echo "$create_station_cmd"
+
+        # 执行命令
         eval "$create_station_cmd"
-    fi
+
+        # 检查 RPC 是否正常
+        read -p "RPC 是否正常？(yes/no): " rpc_status
+        if [[ "$rpc_status" == "yes" ]]; then
+            break
+        fi
+    done
 
     # 创建刷TX脚本
     cd
@@ -315,3 +282,4 @@ function main_menu() {
 
 # 显示主菜单
 main_menu
+
