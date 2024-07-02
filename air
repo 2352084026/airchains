@@ -127,12 +127,14 @@ EOF
     # 获取本机 IP 地址
     LOCAL_IP=$(hostname -I | awk '{print $1}')
 
-    #取消网络代理
+    # 取消网络代理
     unset http_proxy
     unset https_proxy
 
-    # 定义 JSON RPC URL 和其他参数
-    JSON_RPC="https://rpc1.airchains.t.cosmostaking.com/"
+    # 提示用户输入 JSON RPC 地址
+    read -p "请输入新的 JSON RPC 地址: " JSON_RPC
+
+    # 定义其他参数
     INFO="EVM Track"
     TRACKS="$AIR_ADDRESS"
     BOOTSTRAP_NODE="/ip4/$LOCAL_IP/tcp/2300/p2p/$NODE_ID"
@@ -152,6 +154,12 @@ EOF
     # 执行命令
     eval "$create_station_cmd"
 
+    # 修改代码默认的gas price
+    sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 2*gas)/' "$HOME/tracks/junction/verifyPod.go"
+    sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 2*gas)/' "$HOME/tracks/junction/validateVRF.go"
+    sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 3*gas)/' "$HOME/tracks/junction/submitPod.go"
+
+    # 启动station
     sudo tee /etc/systemd/system/stationd.service > /dev/null << EOF
 [Unit]
 Description=station track service
@@ -159,7 +167,6 @@ After=network-online.target
 [Service]
 User=$USER
 WorkingDirectory=$HOME/tracks/
-Environment="PATH=$PATH:/usr/local/go/bin"
 ExecStart=$(which go) run cmd/main.go start
 Restart=always
 RestartSec=3
@@ -167,9 +174,31 @@ LimitNOFILE=65535
 [Install]
 WantedBy=multi-user.target
 EOF
+
     sudo systemctl daemon-reload
     sudo systemctl enable stationd
     sudo systemctl restart stationd
+
+    # 创建刷TX脚本
+    cd
+    addr=$($HOME/wasm-station/build/wasmstationd keys show node --keyring-backend test -a)
+    sudo tee spam.sh > /dev/null << EOF
+#!/bin/bash
+
+while true; do
+  $HOME/wasm-station/build/wasmstationd tx bank send node ${addr} 1stake --from node --chain-id station-1 --keyring-backend test -y 
+  sleep 6  # Add a sleep to avoid overwhelming the system or network
+done
+EOF
+
+    # 确保脚本有执行权限
+    chmod +x spam.sh
+
+    # 后台运行刷TX脚本
+    nohup bash spam.sh &
+
+    echo "所有步骤已完成，您可以使用以下命令查看日志："
+    echo "sudo journalctl -u stationd -f -o cat"
 }
 
 # 更改 JSON RPC 并重启相关服务
@@ -257,4 +286,5 @@ function main_menu() {
 
 # 显示主菜单
 main_menu
+
 
