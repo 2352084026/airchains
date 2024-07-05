@@ -12,14 +12,24 @@ function install_dependencies() {
             sudo apt install -y "$dep"
         fi
     done
+
+    # 检查是否安装 Go
+    if ! command -v go &> /dev/null; then
+        echo "下载并安装 Go..."
+        wget -c https://golang.org/dl/go1.22.3.linux-amd64.tar.gz -O - | sudo tar -xz -C /usr/local
+        echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+        source ~/.bashrc
+    fi
 }
 
 # 安装节点
 function install_node() {
+    cd $HOME
+
     git clone https://github.com/airchains-network/evm-station.git
     git clone https://github.com/airchains-network/tracks.git
 
-    cd $HOME/evm-station && go mod tidy
+    cd evm-station && go mod tidy
 
     nano ./scripts/local-setup.sh
     /bin/bash ./scripts/local-setup.sh
@@ -213,3 +223,4 @@ function main_menu() {
 
 install_dependencies
 main_menu
+
