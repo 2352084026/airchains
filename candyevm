@@ -174,7 +174,8 @@ function evmos_log() {
 }
 
 function stationd_log() {
-    sudo journalctl -u stationd -f -o cat
+    sudo journalctl -u stationd -f -o cat &
+    wait $!
 }
 
 function private_key() {
@@ -270,4 +271,5 @@ function main_menu() {
 
 install_dependencies
 main_menu
+
 
