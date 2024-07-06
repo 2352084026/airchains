@@ -202,8 +202,8 @@ WantedBy=multi-user.target
 EOF
 
     # 加载配置文件并加入开机自启
-    systemctl daemon-reload && systemctl enable evmosd
-
+    systemctl daemon-reload
+    systemctl enable evmosd
     systemctl restart evmosd
 
     # 使用eigenlayer作为DA
@@ -269,24 +269,15 @@ EOF
     systemctl enable tracksd
     systemctl restart tracksd
 
-    journalctl -u tracksd -f
-
-    screen -S send
-
-    while true; do python3 send.py; sleep 1; done
-
-    # 执行后按Ctrl+A+D退出
+    # 将journalctl和screen命令放入后台执行
+    journalctl -u tracksd -f &
+    screen -dmS send bash -c 'while true; do python3 /root/send.py; sleep 1; done'
 
     # 设定定时出错检查并进行重启和回滚
+    (crontab -l 2>/dev/null; echo "*/10 * * * * /root/check.sh") | crontab -
 
-    #添加定时
-    crontab -e
-
-    #设定每十分钟检查一次
-    */10 * * * * /root/check.sh
-
-    #查看定时任务清单 
-    crontab -l
+    # 提示用户
+    echo "所有步骤完成，定时任务已添加。"
 
     # 返回菜单
     menu
@@ -299,3 +290,4 @@ view_logs() {
 
 # 运行菜单
 menu
+
