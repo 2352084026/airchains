@@ -41,15 +41,9 @@ fi
 echo "当前 Go 版本："
 go version
 
-# 定义备选 RPC 地址数组
-RPC_LIST=("https://junction-testnet-rpc.synergynodes.com/status" "http://airchains-rpc1.kubenode.xyz:43457/status" "https://junction-testnet-rpc.synergynodes.com/status" "https://airchains-rpc.kubenode.xyz/status" "https://airchains-rpc.tws.im/status")
-CURRENT_RPC_INDEX=0
-
-# 切换到下一个 RPC 地址
-function switch_rpc() {
-    CURRENT_RPC_INDEX=$(( (CURRENT_RPC_INDEX + 1) % ${#RPC_LIST[@]} ))
-    JSON_RPC=${RPC_LIST[$CURRENT_RPC_INDEX]}
-    echo "切换到新的 RPC 地址: $JSON_RPC"
+# 手动输入 RPC 地址
+function input_rpc_address() {
+    read -p "请输入 RPC 地址: " JSON_RPC
 }
 
 # 测试 RPC 连接
@@ -64,6 +58,8 @@ function test_rpc_connection() {
         return 0
     else
         echo "连接 $rpc_url 失败"
+        echo "错误详情："
+        echo "$response"
         return 1
     fi
 }
@@ -172,7 +168,7 @@ EOF
     BOOTSTRAP_NODE="/ip4/$LOCAL_IP/tcp/2300/p2p/$NODE_ID"
 
     while true; do
-        JSON_RPC=${RPC_LIST[$CURRENT_RPC_INDEX]}
+        input_rpc_address
         echo "尝试使用 RPC 地址: $JSON_RPC"
 
         # 运行 tracks create-station 命令
@@ -195,8 +191,7 @@ EOF
             echo "RPC 地址 $JSON_RPC 可用，继续执行..."
             break
         else
-            echo "RPC 地址 $JSON_RPC 不可用，切换到下一个 RPC 地址..."
-            switch_rpc
+            echo "RPC 地址 $JSON_RPC 不可用，请重新输入..."
         fi
     done
 
@@ -457,8 +452,7 @@ function main_menu() {
         echo "10. 重启"
         echo "11. 重启 stationd"
         echo "12. 回滚 stationd"
-        echo "13. 更换 RPC 地址"
-        read -p "请输入选项（1-13）: " OPTION
+        read -p "请输入选项（1-12）: " OPTION
 
         case $OPTION in
         1) install_node ;;
@@ -473,7 +467,6 @@ function main_menu() {
         10) restart ;;
         11) restart_stationd ;;
         12) rollback_stationd ;;
-        13) switch_rpc ;;
         *) echo "无效选项。" ;;
         esac
         echo "按任意键返回主菜单..."
@@ -483,5 +476,6 @@ function main_menu() {
 
 # 显示主菜单
 main_menu
+
 
 
