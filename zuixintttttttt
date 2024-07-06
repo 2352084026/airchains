@@ -31,7 +31,7 @@ main_script() {
     export id
 
     # 更新系统并安装必要的依赖
-    apt update && apt install build-essential git make jq curl clang pkg-config libssl-dev -y
+    apt update && apt install build-essential git make jq curl clang pkg-config libssl-dev python3-pip -y
 
     # 安装web3
     pip3 install web3
@@ -255,7 +255,7 @@ After=network-online.target
 [Service]
 User=root
 WorkingDirectory=/root/.tracks
-ExecStart=/data/airchains/tracks/build/tracks start
+ExecStart=/data/airchains/tracks/build/tracks start --log_level "debug"
 
 Restart=always
 RestartSec=10
@@ -290,4 +290,5 @@ view_logs() {
 
 # 运行菜单
 menu
+
 
