@@ -191,7 +191,14 @@ EOF
             echo "RPC 地址 $JSON_RPC 可用，继续执行..."
             break
         else
-            echo "RPC 地址 $JSON_RPC 不可用，请重新输入..."
+            echo "RPC 地址 $JSON_RPC 不可用，请选择操作..."
+            read -p "是否继续输入新的RPC地址？(yes/no): " rpc_choice
+            if [[ "$rpc_choice" == "yes" ]]; then
+                echo "用户选择重新输入RPC地址..."
+            else
+                echo "用户选择继续执行..."
+                break
+            fi
         fi
     done
 
@@ -298,7 +305,7 @@ function monitor_stationd_logs() {
         if tail -n 50 "$LOG_FILE" | grep -q "$ERROR_STRING_1"; then
             echo "检测到错误字符串 $ERROR_STRING_1"
             block_count=$((block_count + 1))
-            if [ "$block_count" -ge 25 ]; then
+            if [ "$block_count" -ge 25]; then
                 echo "检测到连续25条 $ERROR_STRING_1 日志，重启 stationd 服务..."
                 sudo systemctl restart stationd
                 block_count=0
@@ -312,7 +319,7 @@ function monitor_stationd_logs() {
             current_time=$(date +%s)
             if [ $((current_time - last_rollback_time)) -gt $restart_interval ]; then
                 echo "错误间隔超过 $restart_interval 秒，更换 RPC 地址并停止 stationd 服务..."
-                switch_rpc
+                input_rpc_address
                 sudo systemctl stop stationd
                 cd $HOME/tracks
                 go run cmd/main.go rollback
@@ -330,7 +337,7 @@ function monitor_stationd_logs() {
             current_time=$(date +%s)
             if [ $((current_time - last_rollback_time)) -gt $restart_interval ]; then
                 echo "错误间隔超过 $restart_interval 秒，更换 RPC 地址并停止 stationd 服务..."
-                switch_rpc
+                input_rpc_address
                 sudo systemctl stop stationd
                 cd $HOME/tracks
                 go run cmd/main.go rollback
@@ -476,6 +483,7 @@ function main_menu() {
 
 # 显示主菜单
 main_menu
+
 
 
 
