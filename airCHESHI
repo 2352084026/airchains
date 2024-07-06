@@ -151,9 +151,6 @@ EOF
     # 获取本机 IP 地址
     LOCAL_IP=$(hostname -I | awk '{print $1}')
 
-    # 取消网络代理
-    unset http_proxy
-    unset https_proxy
 
     while true; do
         # 提示用户输入 JSON RPC 地址
