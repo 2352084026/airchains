@@ -52,6 +52,22 @@ function switch_rpc() {
     echo "切换到新的 RPC 地址: $JSON_RPC"
 }
 
+# 测试 RPC 连接
+function test_rpc_connection() {
+    local rpc_url=$1
+    echo "测试连接 $rpc_url"
+
+    response=$(curl --silent --fail "$rpc_url")
+
+    if [ $? -eq 0 ]; then
+        echo "连接 $rpc_url 成功"
+        return 0
+    else
+        echo "连接 $rpc_url 失败"
+        return 1
+    fi
+}
+
 # 安装节点
 function install_node() {
     sudo apt-get update && sudo apt-get install jq build-essential -y
@@ -151,10 +167,6 @@ EOF
     # 获取本机 IP 地址
     LOCAL_IP=$(hostname -I | awk '{print $1}')
 
-    # 取消网络代理
-    unset http_proxy
-    unset https_proxy
-
     # 定义其他参数
     INFO="EVM Track"
     BOOTSTRAP_NODE="/ip4/$LOCAL_IP/tcp/2300/p2p/$NODE_ID"
@@ -179,10 +191,11 @@ EOF
         eval "$create_station_cmd"
 
         # 检查 RPC 是否正常
-        read -p "RPC 是否正常？(yes/no): " rpc_status
-        if [[ "$rpc_status" == "yes" ]];then
+        if test_rpc_connection "$JSON_RPC"; then
+            echo "RPC 地址 $JSON_RPC 可用，继续执行..."
             break
         else
+            echo "RPC 地址 $JSON_RPC 不可用，切换到下一个 RPC 地址..."
             switch_rpc
         fi
     done
@@ -470,4 +483,5 @@ function main_menu() {
 
 # 显示主菜单
 main_menu
+
 
