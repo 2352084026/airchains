@@ -46,18 +46,20 @@ function input_rpc_address() {
     read -p "请输入 RPC 地址: " JSON_RPC
 }
 
-# 测试 RPC 连接
-function test_rpc_connection() {
-    local rpc_url=$1
-    echo "测试连接 $rpc_url"
+# 获取账户的 nonce
+function get_account_nonce() {
+    local account_address=$1
+    local rpc_url=$2
+    echo "获取账户 $account_address 的 nonce"
 
-    response=$(curl --silent --fail "$rpc_url")
+    response=$(curl --silent --fail "$rpc_url" -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_getTransactionCount","params":["'"$account_address"'", "latest"],"id":1}')
 
     if [ $? -eq 0 ]; then
-        echo "连接 $rpc_url 成功"
+        nonce=$(echo $response | jq -r '.result')
+        echo "账户 $account_address 的 nonce: $nonce"
         return 0
     else
-        echo "连接 $rpc_url 失败"
+        echo "获取账户 $account_address 的 nonce 失败"
         echo "错误详情："
         echo "$response"
         return 1
@@ -166,41 +168,38 @@ EOF
     # 定义其他参数
     INFO="EVM Track"
     BOOTSTRAP_NODE="/ip4/$LOCAL_IP/tcp/2300/p2p/$NODE_ID"
+while true; do
+    input_rpc_address
+    echo "尝试使用 RPC 地址: $JSON_RPC"
 
-    while true; do
-        input_rpc_address
-        echo "尝试使用 RPC 地址: $JSON_RPC"
+    # 运行 tracks create-station 命令
+    create_station_cmd="go run cmd/main.go create-station \
+        --accountName wallet \
+        --accountPath $HOME/.tracks/junction-accounts/keys \
+        --jsonRPC \"$JSON_RPC\" \
+        --info \"$INFO\" \
+        --tracks \"$AIR_ADDRESS\" \
+        --bootstrapNode \"$BOOTSTRAP_NODE\""
 
-        # 运行 tracks create-station 命令
-        create_station_cmd="go run cmd/main.go create-station \
-            --accountName wallet \
-            --accountPath $HOME/.tracks/junction-accounts/keys \
-            --jsonRPC \"$JSON_RPC\" \
-            --info \"$INFO\" \
-            --tracks \"$AIR_ADDRESS\" \
-            --bootstrapNode \"$BOOTSTRAP_NODE\""
+    echo "Running command:"
+    echo "$create_station_cmd"
 
-        echo "Running command:"
-        echo "$create_station_cmd"
+    # 执行命令
+    eval "$create_station_cmd"
 
-        # 执行命令
-        eval "$create_station_cmd"
+    # 获取账户的 nonce
+    nonce=$(web3.eth.getTransactionCount(txData.from))
+    echo "账户的 nonce 值: $nonce"
 
-        # 检查 RPC 是否正常
-        if test_rpc_connection "$JSON_RPC"; then
-            echo "RPC 地址 $JSON_RPC 可用，继续执行..."
-            break
-        else
-            echo "RPC 地址 $JSON_RPC 不可用，请选择操作..."
-            read -p "是否继续输入新的RPC地址？(yes/no): " rpc_choice
-            if [[ "$rpc_choice" == "yes" ]]; then
-                echo "用户选择重新输入RPC地址..."
-            else
-                echo "用户选择继续执行..."
-                break
-            fi
-        fi
-    done
+    # 检查 RPC 是否正常
+    read -p "是否继续输入新的RPC地址？(yes/no): " rpc_choice
+    if [[ "$rpc_choice" == "yes" ]]; then
+        echo "用户选择重新输入RPC地址..."
+    else
+        echo "用户选择继续执行..."
+        break
+    fi
+done
 
     # 创建刷TX脚本
     create_tx_script
@@ -483,6 +482,7 @@ function main_menu() {
 
 # 显示主菜单
 main_menu
+
 
 
 
