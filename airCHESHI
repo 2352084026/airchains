@@ -30,7 +30,7 @@ if command -v go >/dev/null 2>&1; then
     echo "go 已安装，跳过安装步骤。"
 else
     echo "下载并安装 Go..."
-    wget -c https://golang.org/dl/go1.22.4.linux-amd64.tar.gz -O go1.22.4.linux-amd64.tar.gz
+    wget -c http://mirrors.aliyun.com/golang/go1.22.4.linux-amd64.tar.gz -O go1.22.4.linux-amd64.tar.gz
     sudo tar -C /usr/local -xzf go1.22.4.linux-amd64.tar.gz
     echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
     export PATH=$PATH:/usr/local/go/bin  # 确保当前脚本的环境变量也更新
@@ -41,29 +41,15 @@ fi
 echo "当前 Go 版本："
 go version
 
-# 手动输入 RPC 地址
-function input_rpc_address() {
-    read -p "请输入 RPC 地址: " JSON_RPC
-}
+# 定义备选 RPC 地址数组
+RPC_LIST=("https://junction-testnet-rpc.synergynodes.com/status" "http://airchains-rpc1.kubenode.xyz:43457/status" "https://junction-testnet-rpc.synergynodes.com/status" "https://airchains-rpc.kubenode.xyz/status" "https://airchains-rpc.tws.im/status")
+CURRENT_RPC_INDEX=0
 
-# 获取账户的 nonce
-function get_account_nonce() {
-    local account_address=$1
-    local rpc_url=$2
-    echo "获取账户 $account_address 的 nonce"
-
-    response=$(curl --silent --fail "$rpc_url" -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_getTransactionCount","params":["'"$account_address"'", "latest"],"id":1}')
-
-    if [ $? -eq 0 ]; then
-        nonce=$(echo $response | jq -r '.result')
-        echo "账户 $account_address 的 nonce: $nonce"
-        return 0
-    else
-        echo "获取账户 $account_address 的 nonce 失败"
-        echo "错误详情："
-        echo "$response"
-        return 1
-    fi
+# 切换到下一个 RPC 地址
+function switch_rpc() {
+    CURRENT_RPC_INDEX=$(( (CURRENT_RPC_INDEX + 1) % ${#RPC_LIST[@]} ))
+    JSON_RPC=${RPC_LIST[$CURRENT_RPC_INDEX]}
+    echo "切换到新的 RPC 地址: $JSON_RPC"
 }
 
 # 安装节点
@@ -74,7 +60,7 @@ function install_node() {
         git clone https://github.com/airchains-network/wasm-station.git
     fi
     if [ ! -d "$HOME/tracks" ]; then
-        clone_tracks_repo
+        git clone https://github.com/airchains-network/tracks.git
     fi
     cd wasm-station
     go mod tidy
@@ -117,21 +103,11 @@ EOF
     echo "123" | eigenlayer operator keys create --key-type ecdsa --insecure wallet
 
     sudo rm -rf ~/.tracks
-
-    # 确保 tracks 目录存在
-    if [ ! -d "$HOME/tracks" ];then
-        echo "$HOME/tracks 目录不存在，尝试重新克隆 tracks 仓库..."
-        clone_tracks_repo
-    fi
-
     cd $HOME/tracks
-
-    # 确保 go.mod 文件存在
     if [ ! -f "go.mod" ];then
-        echo "go.mod 文件不存在，请检查 tracks 仓库是否正确克隆。"
+        echo "go.mod 文件不存在，请检查tracks仓库是否正确克隆。"
         exit 1
     fi
-
     go mod tidy
 
     # 提示用户输入公钥和节点名
@@ -175,18 +151,16 @@ EOF
     # 获取本机 IP 地址
     LOCAL_IP=$(hostname -I | awk '{print $1}')
 
-    # 取消代理设置
-    echo "取消代理设置..."
-    unset http_proxy
-    unset https_proxy
-    echo "已取消代理。"
-
     # 定义其他参数
     INFO="EVM Track"
     BOOTSTRAP_NODE="/ip4/$LOCAL_IP/tcp/2300/p2p/$NODE_ID"
 
+    # 取消网络代理
+    unset http_proxy
+    unset https_proxy
+
     while true; do
-        input_rpc_address
+        JSON_RPC=${RPC_LIST[$CURRENT_RPC_INDEX]}
         echo "尝试使用 RPC 地址: $JSON_RPC"
 
         # 运行 tracks create-station 命令
@@ -198,23 +172,18 @@ EOF
             --tracks \"$AIR_ADDRESS\" \
             --bootstrapNode \"$BOOTSTRAP_NODE\""
 
-        echo "Running command:"
+        echo "运行命令:"
         echo "$create_station_cmd"
 
         # 执行命令
         eval "$create_station_cmd"
 
-        # 获取账户的 nonce
-        nonce=$(web3.eth.getTransactionCount(txData.from))
-        echo "账户的 nonce 值: $nonce"
-
         # 检查 RPC 是否正常
-        read -p "是否继续输入新的RPC地址？(yes/no): " rpc_choice
-        if [[ "$rpc_choice" == "yes" ]];then
-            echo "用户选择重新输入RPC地址..."
-        else
-            echo "用户选择继续执行..."
+        read -p "RPC 是否正常？(yes/no): " rpc_status
+        if [[ "$rpc_status" == "yes" ]];then
             break
+        else
+            switch_rpc
         fi
     done
 
@@ -228,28 +197,6 @@ EOF
 
     # 设置stationd服务并查看日志
     setup_stationd_service
-}
-
-# 克隆 tracks 仓库的函数
-function clone_tracks_repo() {
-    local retries=3
-    local count=0
-    while [ $count -lt $retries ];do
-        git clone https://hub.fastgit.org/airchains-network/tracks.git $HOME/tracks
-        if [ $? -eq 0 ]; then
-            echo "克隆成功"
-            break
-        else
-            count=$((count+1))
-            echo "克隆失败，重试第 $count 次..."
-            sleep 5
-        fi
-    done
-
-    if [ ! -d "$HOME/tracks" ];then
-        echo "克隆 tracks 仓库失败，请检查网络连接或仓库地址。"
-        exit 1
-    fi
 }
 
 # 创建刷TX脚本的函数
@@ -270,7 +217,7 @@ function create_tx_script() {
 
 while true; do
   $HOME/wasm-station/build/wasmstationd tx bank send node ${addr} 1stake --from node --chain-id station-1 --keyring-backend test -y
-  sleep ${delay_time}  # Add a sleep to avoid overwhelming the system or network
+  sleep ${delay_time}  # 添加 sleep 以避免系统或网络过载
 done
 EOF
 
@@ -340,10 +287,10 @@ function monitor_stationd_logs() {
         echo "开始检测错误日志..."
 
         # 检查错误日志
-        if tail -n 50 "$LOG_FILE" | grep -q "$ERROR_STRING_1";then
+        if tail -n 50 "$LOG_FILE" | grep -q "$ERROR_STRING_1"; then
             echo "检测到错误字符串 $ERROR_STRING_1"
             block_count=$((block_count + 1))
-            if [ "$block_count" -ge 25 ];then
+            if [ "$block_count" -ge 25 ]; then
                 echo "检测到连续25条 $ERROR_STRING_1 日志，重启 stationd 服务..."
                 sudo systemctl restart stationd
                 block_count=0
@@ -352,12 +299,12 @@ function monitor_stationd_logs() {
             block_count=0
         fi
 
-        if tail -n 100 "$LOG_FILE" | grep -q "$ERROR_STRING_2";then
+        if tail -n 100 "$LOG_FILE" | grep -q "$ERROR_STRING_2"; then
             echo "检测到错误字符串 $ERROR_STRING_2"
             current_time=$(date +%s)
-            if [ $((current_time - last_rollback_time)) -gt $restart_interval ];then
+            if [ $((current_time - last_rollback_time)) -gt $restart_interval ]; then
                 echo "错误间隔超过 $restart_interval 秒，更换 RPC 地址并停止 stationd 服务..."
-                input_rpc_address
+                switch_rpc
                 sudo systemctl stop stationd
                 cd $HOME/tracks
                 go run cmd/main.go rollback
@@ -370,12 +317,12 @@ function monitor_stationd_logs() {
             fi
         fi
 
-        if tail -n 100 "$LOG_FILE" | grep -q "$ERROR_STRING_3";then
+        if tail -n 100 "$LOG_FILE" | grep -q "$ERROR_STRING_3"; then
             echo "检测到错误字符串 $ERROR_STRING_3"
             current_time=$(date +%s)
-            if [ $((current_time - last_rollback_time)) -gt $restart_interval ];then
+            if [ $((current_time - last_rollback_time)) -gt $restart_interval ]; then
                 echo "错误间隔超过 $restart_interval 秒，更换 RPC 地址并停止 stationd 服务..."
-                input_rpc_address
+                switch_rpc
                 sudo systemctl stop stationd
                 cd $HOME/tracks
                 go run cmd/main.go rollback
@@ -388,7 +335,7 @@ function monitor_stationd_logs() {
             fi
         fi
 
-        if tail -n 100 "$LOG_FILE" | grep -q "$ERROR_STRING_4";then
+        if tail -n 100 "$LOG_FILE" | grep -q "$ERROR_STRING_4"; then
             echo "检测到错误关键词 $ERROR_STRING_4 ，重新启动 stationd 服务..."
             sudo systemctl restart stationd
         fi
@@ -480,20 +427,9 @@ function rollback_stationd() {
     echo "stationd 服务已回滚并重启。"
 }
 
-# 设置代理
-function set_proxy() {
-    read -p "请输入 HTTP 代理地址: " http_proxy
-    read -p "请输入 HTTPS 代理地址: " https_proxy
-
-    export http_proxy=$http_proxy
-    export https_proxy=$https_proxy
-
-    echo "已设置代理 HTTP: $http_proxy, HTTPS: $https_proxy"
-}
-
 # 主菜单
 function main_menu() {
-    while true;do
+    while true; do
         clear
         echo "请选择要执行的操作:"
         echo "1. 安装节点"
@@ -508,7 +444,7 @@ function main_menu() {
         echo "10. 重启"
         echo "11. 重启 stationd"
         echo "12. 回滚 stationd"
-        echo "13. 设置代理"
+        echo "13. 更换 RPC 地址"
         read -p "请输入选项（1-13）: " OPTION
 
         case $OPTION in
@@ -524,7 +460,7 @@ function main_menu() {
         10) restart ;;
         11) restart_stationd ;;
         12) rollback_stationd ;;
-        13) set_proxy ;;
+        13) switch_rpc ;;
         *) echo "无效选项。" ;;
         esac
         echo "按任意键返回主菜单..."
@@ -534,6 +470,7 @@ function main_menu() {
 
 # 显示主菜单
 main_menu
+
 
 
 
