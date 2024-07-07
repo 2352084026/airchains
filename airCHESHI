@@ -235,7 +235,7 @@ function clone_tracks_repo() {
     local retries=3
     local count=0
     while [ $count -lt $retries ];do
-        git clone https://github.com/airchains-network/tracks.git $HOME/tracks
+        git clone https://hub.fastgit.org/airchains-network/tracks.git $HOME/tracks
         if [ $? -eq 0 ]; then
             echo "克隆成功"
             break
@@ -534,6 +534,7 @@ function main_menu() {
 
 # 显示主菜单
 main_menu
+
 
 
 
