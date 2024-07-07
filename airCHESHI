@@ -235,7 +235,7 @@ function clone_tracks_repo() {
     local retries=3
     local count=0
     while [ $count -lt $retries ];do
-        git clone https://github.com/airchains-network/tracks.git $HOME/tracks && break
+        git clone https://mirrors.tuna.tsinghua.edu.cn/git/airchains-network/tracks.git $HOME/tracks
         count=$((count+1))
         echo "克隆失败，重试第 $count 次..."
         sleep 5
