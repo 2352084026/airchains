@@ -30,7 +30,7 @@ if command -v go >/dev/null 2>&1; then
     echo "go 已安装，跳过安装步骤。"
 else
     echo "下载并安装 Go..."
-    wget -c http://mirrors.aliyun.com/golang/go1.22.4.linux-amd64.tar.gz -O go1.22.4.linux-amd64.tar.gz
+    wget -c https://golang.org/dl/go1.22.4.linux-amd64.tar.gz -O go1.22.4.linux-amd64.tar.gz
     sudo tar -C /usr/local -xzf go1.22.4.linux-amd64.tar.gz
     echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
     export PATH=$PATH:/usr/local/go/bin  # 确保当前脚本的环境变量也更新
@@ -235,10 +235,15 @@ function clone_tracks_repo() {
     local retries=3
     local count=0
     while [ $count -lt $retries ];do
-        git clone https://mirrors.tuna.tsinghua.edu.cn/git/airchains-network/tracks.git $HOME/tracks
-        count=$((count+1))
-        echo "克隆失败，重试第 $count 次..."
-        sleep 5
+        git clone https://github.com/airchains-network/tracks.git $HOME/tracks
+        if [ $? -eq 0 ]; then
+            echo "克隆成功"
+            break
+        else
+            count=$((count+1))
+            echo "克隆失败，重试第 $count 次..."
+            sleep 5
+        fi
     done
 
     if [ ! -d "$HOME/tracks" ];then
@@ -529,6 +534,7 @@ function main_menu() {
 
 # 显示主菜单
 main_menu
+
 
 
 
