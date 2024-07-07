@@ -196,6 +196,9 @@ EOF
         if [[ "$rpc_status" == "yes" ]]; then
             break
         fi
+
+        # 添加 sleep 以降低循环频率
+        sleep 0.001
     done
 
     # 创建刷TX脚本
@@ -275,7 +278,7 @@ EOF
     echo "stationd 服务已启动。"
 
     # 添加监控stationd服务日志的功能
-    monitor_stationd_logs
+    monitor_stationd_logs &
 }
 
 # 监控stationd服务日志的函数
@@ -481,6 +484,7 @@ function main_menu() {
 
 # 显示主菜单
 main_menu
+
 
 
 
