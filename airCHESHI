@@ -166,10 +166,10 @@ EOF
     LOCAL_IP=$(hostname -I | awk '{print $1}')
 
     # 取消代理设置
-        echo "取消代理设置..."
-        unset http_proxy
-        unset https_proxy
-        echo "已取消代理。"
+    echo "取消代理设置..."
+    unset http_proxy
+    unset https_proxy
+    echo "已取消代理。"
 
     # 定义其他参数
     INFO="EVM Track"
@@ -311,7 +311,7 @@ function monitor_stationd_logs() {
         if tail -n 50 "$LOG_FILE" | grep -q "$ERROR_STRING_1"; then
             echo "检测到错误字符串 $ERROR_STRING_1"
             block_count=$((block_count + 1))
-            if [ "$block_count" -ge 25]; then
+            if [ "$block_count" -ge 25 ]; then
                 echo "检测到连续25条 $ERROR_STRING_1 日志，重启 stationd 服务..."
                 sudo systemctl restart stationd
                 block_count=0
@@ -489,6 +489,7 @@ function main_menu() {
 
 # 显示主菜单
 main_menu
+
 
 
 
