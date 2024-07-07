@@ -160,7 +160,7 @@ EOF
     unset https_proxy
 
     while true; do
-        JSON_RPC=${RPC_LIST[$CURRENT_RPC_INDEX]}
+        read -p "请输入 RPC 地址: " JSON_RPC
         echo "尝试使用 RPC 地址: $JSON_RPC"
 
         # 运行 tracks create-station 命令
@@ -182,8 +182,6 @@ EOF
         read -p "RPC 是否正常？(yes/no): " rpc_status
         if [[ "$rpc_status" == "yes" ]];then
             break
-        else
-            switch_rpc
         fi
     done
 
@@ -470,6 +468,7 @@ function main_menu() {
 
 # 显示主菜单
 main_menu
+
 
 
 
