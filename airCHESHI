@@ -117,11 +117,21 @@ EOF
     echo "123" | eigenlayer operator keys create --key-type ecdsa --insecure wallet
 
     sudo rm -rf ~/.tracks
+
+    # 确保 tracks 目录存在
+    if [ ! -d "$HOME/tracks" ]; then
+        echo "$HOME/tracks 目录不存在，尝试重新克隆 tracks 仓库..."
+        git clone https://github.com/airchains-network/tracks.git $HOME/tracks
+    fi
+
     cd $HOME/tracks
-    if [ ! -f "go.mod" ];then
-        echo "go.mod 文件不存在，请检查tracks仓库是否正确克隆。"
+
+    # 确保 go.mod 文件存在
+    if [ ! -f "go.mod" ]; then
+        echo "go.mod 文件不存在，请检查 tracks 仓库是否正确克隆。"
         exit 1
     fi
+
     go mod tidy
 
     # 提示用户输入公钥和节点名
@@ -324,7 +334,7 @@ function monitor_stationd_logs() {
             echo "检测到错误字符串 $ERROR_STRING_2"
             current_time=$(date +%s)
             if [ $((current_time - last_rollback_time)) -gt $restart_interval ]; then
-                echo "错误间隔超过 $restart_interval 秒，更换 RPC 地址并停止 stationd 服务..."
+                echo "错误间隔超过 $restart间隔 秒，更换 RPC 地址并停止 stationd 服务..."
                 input_rpc_address
                 sudo systemctl stop stationd
                 cd $HOME/tracks
@@ -489,6 +499,7 @@ function main_menu() {
 
 # 显示主菜单
 main_menu
+
 
 
 
