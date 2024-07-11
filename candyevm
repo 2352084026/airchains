@@ -1,5 +1,14 @@
 #!/bin/bash
 
+# 移除现有的 Go 安装
+function remove_existing_go() {
+    sudo rm -rf /usr/local/go
+    sudo rm -f /usr/local/go/bin/go
+    sudo rm -f /usr/local/go/bin/gofmt
+    sed -i '/\/usr\/local\/go\/bin/d' ~/.profile
+    source ~/.profile
+}
+
 # 安装所需的软件包
 function install_dependencies() {
     dependencies=("build-essential" "git" "make" "jq" "curl" "clang" "pkg-config" "libssl-dev" "wget")
@@ -229,8 +238,10 @@ function main_menu() {
     done
 }
 
+remove_existing_go
 install_dependencies
 main_menu
+
 
 
 
