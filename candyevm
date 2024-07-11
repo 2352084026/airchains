@@ -1,11 +1,5 @@
 #!/bin/bash
 
-# 监控的错误信息
-ERROR_STRING_1="cosmos/cosmos-sdk@v0.50.3/baseapp/baseapp.go:991"
-ERROR_STRING_2="Failed to Init VRF"
-
-LOG_FILE="$HOME/logfile.log"
-
 # 安装所需的软件包
 function install_dependencies() {
     dependencies=("build-essential" "git" "make" "jq" "curl" "clang" "pkg-config" "libssl-dev" "wget")
@@ -19,23 +13,24 @@ function install_dependencies() {
         fi
     done
 
-    # 检查是否安装 Go
+    # 检查是否安装了 Go
     if ! command -v go &> /dev/null; then
-        echo "下载并安装 Go..."
-        wget -c https://golang.org/dl/go1.22.3.linux-amd64.tar.gz -O - | sudo tar -xz -C /usr/local
-        echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-        source ~/.bashrc
+        echo "Go 未安装，正在安装..."
+        wget https://dl.google.com/go/go1.16.4.linux-amd64.tar.gz
+        sudo tar -C /usr/local -xzf go1.16.4.linux-amd64.tar.gz
+        echo "export PATH=$PATH:/usr/local/go/bin" >> ~/.profile
+        source ~/.profile
+    else
+        echo "Go 已安装，跳过安装步骤。"
     fi
 }
 
 # 安装节点
 function install_node() {
-    cd $HOME
-
     git clone https://github.com/airchains-network/evm-station.git
     git clone https://github.com/airchains-network/tracks.git
 
-    cd evm-station && go mod tidy
+    cd $HOME/evm-station && go mod tidy
 
     nano ./scripts/local-setup.sh
     /bin/bash ./scripts/local-setup.sh
@@ -131,21 +126,11 @@ EOF
     NODE_ID=$(grep 'node_id =' $CONFIG_PATH | awk -F'"' '{print $2}')
     LOCAL_IP=$(hostname -I | awk '{print $1}')
 
-    # 手动输入 RPC 地址
-    while true; do
-        read -p "请输入新的 JSON RPC 地址: " JSON_RPC
+    create_station_cmd="go run cmd/main.go create-station --accountName wallet --accountPath $HOME/.tracks/junction-accounts/keys --jsonRPC \"https://airchains-rpc.kubenode.xyz/\" --info \"EVM Track\" --tracks \"$AIR_ADDRESS\" --bootstrapNode \"/ip4/$LOCAL_IP/tcp/2300/p2p/$NODE_ID\""
 
-        create_station_cmd="go run cmd/main.go create-station --accountName wallet --accountPath $HOME/.tracks/junction-accounts/keys --jsonRPC \"$JSON_RPC\" --info \"EVM Track\" --tracks \"$AIR_ADDRESS\" --bootstrapNode \"/ip4/$LOCAL_IP/tcp/2300/p2p/$NODE_ID\""
-
-        echo "Running command:"
-        echo "$create_station_cmd"
-        eval "$create_station_cmd"
-
-        read -p "RPC 是否正常？(yes/no): " rpc_status
-        if [[ "$rpc_status" == "yes" ]]; then
-            break
-        fi
-    done
+    echo "Running command:"
+    echo "$create_station_cmd"
+    eval "$create_station_cmd"
 
     sudo tee /etc/systemd/system/stationd.service > /dev/null << EOF
 [Unit]
@@ -164,9 +149,6 @@ EOF
     sudo systemctl daemon-reload
     sudo systemctl enable stationd
     sudo systemctl restart stationd
-
-    # 启动日志监控
-    monitor_stationd_logs &
 }
 
 function evmos_log() {
@@ -174,8 +156,7 @@ function evmos_log() {
 }
 
 function stationd_log() {
-    sudo journalctl -u stationd -f -o cat &
-    wait $!
+    sudo journalctl -u stationd -f -o cat
 }
 
 function private_key() {
@@ -205,37 +186,6 @@ function delete_node() {
     sudo journalctl --vacuum-time=1s
 }
 
-function monitor_stationd_logs() {
-    echo "开始监控 stationd 日志..."
-
-    # 实时输出日志到指定文件，并且在后台运行
-    sudo journalctl -u stationd -f -o cat > "$LOG_FILE" &
-
-    # 获取 journalctl 命令的进程ID，以便稍后停止
-    JOURNALCTL_PID=$!
-
-    # 循环检查日志文件中是否包含错误字符串
-    while true; do
-        # 仅读取日志文件的最新3行来检测第一个错误字符串
-        TAIL_LINES_3=$(tail -n 3 "$LOG_FILE")
-        
-        if echo "$TAIL_LINES_3" | grep -q "$ERROR_STRING_1"; then
-            echo "检测到错误信息 '$ERROR_STRING_1'，重启 stationd 服务..."
-            sudo systemctl restart stationd
-        fi
-
-        # 仅读取日志文件的最新100行来检测第二个错误字符串
-        TAIL_LINES_100=$(tail -n 100 "$LOG_FILE")
-
-        if echo "$TAIL_LINES_100" | grep -q "$ERROR_STRING_2"; then
-            echo "检测到错误信息 '$ERROR_STRING_2'，重启 stationd 服务..."
-            sudo systemctl restart stationd
-        fi
-
-        sleep 60
-    done
-}
-
 function main_menu() {
     while true; do
         clear
@@ -250,7 +200,7 @@ function main_menu() {
         echo "1. 安装节点"
         echo "2. 查看evmos状态"
         echo "3. 查看stationd状态"
-        echo "4. 导出所有私钥"
+        echo "4. 导出evm私钥和air助记词（第一行为evm私钥，第二行开始为air的助记词）"
         echo "5. 查看avail地址"
         echo "6. 删除节点"
         read -p "请输入选项（1-6）: " OPTION
@@ -271,5 +221,6 @@ function main_menu() {
 
 install_dependencies
 main_menu
+
 
 
