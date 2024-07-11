@@ -27,8 +27,18 @@ function install_dependencies() {
 
 # 安装节点
 function install_node() {
-    git clone https://github.com/airchains-network/evm-station.git
-    git clone https://github.com/airchains-network/tracks.git
+    git clone https://github.com/airchains-network/evm-station.git $HOME/evm-station
+    git clone https://github.com/airchains-network/tracks.git $HOME/tracks
+
+    if [ ! -d "$HOME/evm-station" ]; then
+        echo "克隆 evm-station 失败，退出脚本。"
+        exit 1
+    fi
+
+    if [ ! -d "$HOME/tracks" ]; then
+        echo "克隆 tracks 失败，退出脚本。"
+        exit 1
+    fi
 
     cd $HOME/evm-station && go mod tidy
 
@@ -221,6 +231,7 @@ function main_menu() {
 
 install_dependencies
 main_menu
+
 
 
 
