@@ -16,9 +16,9 @@ function install_dependencies() {
     # 检查是否安装了 Go
     if ! command -v go &> /dev/null; then
         echo "Go 未安装，正在安装..."
-        wget https://dl.google.com/go/go1.16.4.linux-amd64.tar.gz
-        sudo tar -C /usr/local -xzf go1.16.4.linux-amd64.tar.gz
-        echo "export PATH=$PATH:/usr/local/go/bin:/usr/local/go/bin" >> ~/.profile
+        wget https://go.dev/dl/go1.21.1.linux-amd64.tar.gz
+        sudo tar -C /usr/local -xzf go1.21.1.linux-amd64.tar.gz
+        echo "export PATH=\$PATH:/usr/local/go/bin" >> ~/.profile
         source ~/.profile
     else
         echo "Go 已安装，跳过安装步骤。"
@@ -231,6 +231,7 @@ function main_menu() {
 
 install_dependencies
 main_menu
+
 
 
 
