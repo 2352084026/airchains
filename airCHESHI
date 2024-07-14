@@ -25,17 +25,17 @@ install_if_needed pkg-config
 install_if_needed libssl-dev
 install_if_needed wget
 
-# 检查并安装 Go
-if command -v go >/dev/null 2>&1; then
-    echo "go 已安装，跳过安装步骤。"
-else
-    echo "下载并安装 Go..."
-    wget -c http://mirrors.aliyun.com/golang/go1.22.4.linux-amd64.tar.gz -O go1.22.4.linux-amd64.tar.gz
-    sudo tar -C /usr/local -xzf go1.22.4.linux-amd64.tar.gz
-    echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-    export PATH=$PATH:/usr/local/go/bin  # 确保当前脚本的环境变量也更新
-    source ~/.bashrc
-fi
+# 删除现有的 Go 版本
+echo "删除现有的 Go 版本..."
+sudo rm -rf /usr/local/go
+
+# 下载并安装最新版本的 Go
+echo "下载并安装 Go..."
+wget -c https://golang.google.cn/dl/go1.22.4.linux-amd64.tar.gz -O go1.22.4.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.22.4.linux-amd64.tar.gz
+echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+export PATH=$PATH:/usr/local/go/bin  # 确保当前脚本的环境变量也更新
+source ~/.bashrc
 
 # 验证安装后的 Go 版本
 echo "当前 Go 版本："
@@ -186,9 +186,6 @@ EOF
             --bootstrapNode \"$BOOTSTRAP_NODE\""
 
         echo "运行命令:"
-        echo "$create_station_cmd"
-
-        # 执行命令
         eval "$create_station_cmd"
 
         # 检查 RPC 是否正常
@@ -281,10 +278,10 @@ EOF
     monitor_stationd_logs &
 }
 
-# 监控stationd服务日志的函数
+# 监控 stationd 服务日志的函数
 function monitor_stationd_logs() {
     local last_restart_time=0
-    local restart_interval=300  # 5分钟间隔，防止频繁重启
+    local restart_interval=60  # 1分钟间隔，防止频繁重启
     local last_rollback_time=0  # 上次回滚的时间
     local block_count=0
 
@@ -423,9 +420,9 @@ function restart() {
 }
 
 function setgas(){
-    sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 10*gas)/' "$HOME/tracks/junction/verifyPod.go"
-    sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 10*gas)/' "$HOME/tracks/junction/validateVRF.go"
-    sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 15*gas)/' "$HOME/tracks/junction/submitPod.go"
+    sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 5*gas)/' "$HOME/tracks/junction/verifyPod.go"
+    sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 5*gas)/' "$HOME/tracks/junction/validateVRF.go"
+    sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 10*gas)/' "$HOME/tracks/junction/submitPod.go"
     echo "设置gas"
 }
 
@@ -500,6 +497,7 @@ function main_menu() {
 
 # 显示主菜单
 main_menu
+
 
 
 
