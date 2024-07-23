@@ -361,9 +361,9 @@ function restart() {
 }
 
 function setgas() {
-    sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 1*gas)/' "$HOME/tracks/junction/verifyPod.go"
-    sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 1*gas)/' "$HOME/tracks/junction/validateVRF.go"
-    sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 2*gas)/' "$HOME/tracks/junction/submitPod.go"
+    sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 5*gas)/' "$HOME/tracks/junction/verifyPod.go"
+    sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 5*gas)/' "$HOME/tracks/junction/validateVRF.go"
+    sed -i 's/gasFees := fmt.Sprintf("%damf", gas)/gasFees := fmt.Sprintf("%damf", 10*gas)/' "$HOME/tracks/junction/submitPod.go"
 
     # 进入项目目录并重新编译程序
     cd $HOME/tracks
